@@ -1,0 +1,10 @@
+[package]
+name = "lilyplayer-web"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+shuttle-service = { version = "0.3.3" }
