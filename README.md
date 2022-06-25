@@ -27,8 +27,8 @@ magic http headers. Now lilyplayer is a 50MiB application, and embedding the dat
 didn't work due to a size limit of shuttle.rs. So instead, the files are hosted here on github, and the webserver
 will download them first to send them after. Essentially, the webserver is a very simple proxy.
 
-This repository contains the code of that webserver.
-
+This repository contains the code of that webserver. The assets (i.e. html and javascript files) are available
+on a different branch.
 
 
 [^1]: Note that the native app provides a nicer user experience.

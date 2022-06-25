@@ -83,12 +83,10 @@ pub struct MyFile(RequestedFile);
 
 impl<'r> Responder<'r, 'static> for MyFile {
     fn respond_to(self, _req: &'r Request<'_>) -> response::Result<'static> {
-        let (content_type, data) = if self.0 == RequestedFile::MainLilyplayer {
-            (ContentType::HTML, &*MAIN_FILE)
-        } else if self.0 == RequestedFile::WorkerJs {
-            (ContentType::JavaScript, &*WORKER_FILE)
-        } else {
-            return Err(rocket::http::Status::NotFound);
+        let (content_type, data) = match self.0 {
+            RequestedFile::MainLilyplayer => (ContentType::HTML, &*MAIN_FILE),
+            RequestedFile::WorkerJs => (ContentType::JavaScript, &*WORKER_FILE),
+            _ => return Err(rocket::http::Status::NotFound),
         };
 
         let mut response = Response::build();
