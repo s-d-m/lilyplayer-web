@@ -103,12 +103,10 @@ impl<'r> Responder<'r, 'static> for MyFile {
 
 #[get("/<path>")]
 fn lilyplayer_files(path: &str) -> Option<MyFile> {
-    if (path == "lilyplayer.html") || (path == "index.html") {
-        Some(MyFile(RequestedFile::MainLilyplayer))
-    } else if path == "lilyplayer.worker.js" {
-        Some(MyFile(RequestedFile::WorkerJs))
-    } else {
-        None
+    match path {
+        "lilyplayer.html" | "index.html" => Some(MyFile(RequestedFile::MainLilyplayer)),
+        "lilyplayer.worker.js" => Some(MyFile(RequestedFile::WorkerJs)),
+        &_ => None,
     }
 }
 
