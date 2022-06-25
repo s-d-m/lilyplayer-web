@@ -1,4 +1,3 @@
-#![feature(read_buf)]
 #[macro_use]
 extern crate rocket;
 
@@ -6,7 +5,7 @@ use rocket::http::ContentType;
 use rocket::request::Request;
 use rocket::response::{self, Responder, Response};
 use shuttle_service::ShuttleRocket;
-use std::io::{ErrorKind, Read, ReadBuf};
+use std::io::{ErrorKind, Read};
 
 #[macro_use]
 extern crate lazy_static;
@@ -16,59 +15,22 @@ fn default_read_to_end<R: Read + ?Sized>(
     r: &mut R,
     buf: &mut Vec<u8>,
 ) -> Result<usize, std::io::Error> {
-    let start_len = buf.len();
-    let start_cap = buf.capacity();
-
-    let mut initialized = 0; // Extra initialized bytes from previous loop iteration
     loop {
         if buf.len() == buf.capacity() {
-            buf.reserve(32); // buf is full, need more space
+            buf.reserve((buf.len() * 3 / 2) + 5); // buf is full, need more space
         }
 
-        let mut read_buf = ReadBuf::uninit(buf.spare_capacity_mut());
+        let mut tmp_buf = [0u8; 32];
 
-        // SAFETY: These bytes were initialized but not filled in the previous loop
-        unsafe {
-            read_buf.assume_init(initialized);
-        }
-
-        match r.read_buf(&mut read_buf) {
-            Ok(()) => {}
+        match r.read(&mut tmp_buf) {
+            Ok(nr_bytes) => {
+                if nr_bytes == 0 {
+                    return Ok(buf.len());
+                }
+                buf.extend_from_slice(&tmp_buf[..nr_bytes]);
+            }
             Err(e) if e.kind() == ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
-        }
-
-        if read_buf.filled_len() == 0 {
-            return Ok(buf.len() - start_len);
-        }
-
-        // store how much was initialized but not filled
-        initialized = read_buf.initialized_len() - read_buf.filled_len();
-        let new_len = read_buf.filled_len() + buf.len();
-
-        // SAFETY: ReadBuf's invariants mean this much memory is init
-        unsafe {
-            buf.set_len(new_len);
-        }
-
-        if buf.len() == buf.capacity() && buf.capacity() == start_cap {
-            // The buffer might be an exact fit. Let's read into a probe buffer
-            // and see if it returns `Ok(0)`. If so, we've avoided an
-            // unnecessary doubling of the capacity. But if not, append the
-            // probe buffer to the primary buffer and let its capacity grow.
-            let mut probe = [0u8; 32];
-
-            loop {
-                match r.read(&mut probe) {
-                    Ok(0) => return Ok(buf.len() - start_len),
-                    Ok(n) => {
-                        buf.extend_from_slice(&probe[..n]);
-                        break;
-                    }
-                    Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
-                    Err(e) => return Err(e),
-                }
-            }
         }
     }
 }
