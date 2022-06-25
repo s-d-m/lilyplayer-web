@@ -141,8 +141,8 @@ impl<'r> Responder<'r, 'static> for MyFile {
     }
 }
 
-#[get("/myfile/<path>")]
-fn myfile(path: &str) -> Option<MyFile> {
+#[get("/<path>")]
+fn lilyplayer_files(path: &str) -> Option<MyFile> {
     if (path == "lilyplayer.html") || (path == "index.html") {
         Some(MyFile(RequestedFile::MainLilyplayer))
     } else if path == "lilyplayer.worker.js" {
@@ -152,9 +152,16 @@ fn myfile(path: &str) -> Option<MyFile> {
     }
 }
 
+#[get("/")]
+fn entry_point() -> Option<MyFile> {
+    lilyplayer_files("lilyplayer.html")
+}
+
 #[shuttle_service::main]
 async fn init() -> ShuttleRocket {
-    let rocket = rocket::build().mount("/", routes![myfile]);
+    let rocket = rocket::build()
+        .mount("/", routes![lilyplayer_files])
+        .mount("/", routes![entry_point]);
 
     Ok(rocket)
 }
