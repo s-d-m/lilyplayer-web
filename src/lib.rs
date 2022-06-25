@@ -63,12 +63,12 @@ fn download_file(path: &str) -> Option<String> {
 lazy_static! {
     static ref MAIN_FILE: Option<String> = {
         download_file(
-            "https://raw.githubusercontent.com/s-d-m/lilyplayer-web/master/assets/lilyplayer.html",
+            "https://raw.githubusercontent.com/s-d-m/lilyplayer-web/branch_with_assets/assets/lilyplayer.html",
         )
     };
     static ref WORKER_FILE: Option<String> = {
         download_file(
-            "https://raw.githubusercontent.com/s-d-m/lilyplayer-web/master/assets/lilyplayer.worker.js",
+            "https://raw.githubusercontent.com/s-d-m/lilyplayer-web/branch_with_assets/assets/lilyplayer.worker.js",
         )
     };
 }
