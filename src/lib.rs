@@ -16,10 +16,6 @@ fn default_read_to_end<R: Read + ?Sized>(
     buf: &mut Vec<u8>,
 ) -> Result<usize, std::io::Error> {
     loop {
-        if buf.len() == buf.capacity() {
-            buf.reserve((buf.len() * 3 / 2) + 5); // buf is full, need more space
-        }
-
         let mut tmp_buf = [0u8; 32];
 
         match r.read(&mut tmp_buf) {
@@ -27,6 +23,10 @@ fn default_read_to_end<R: Read + ?Sized>(
                 if nr_bytes == 0 {
                     return Ok(buf.len());
                 }
+                if buf.len() + nr_bytes > buf.capacity() {
+                    buf.reserve((buf.len() * 3 / 2) + 5); // buf is full, need more space
+                }
+
                 buf.extend_from_slice(&tmp_buf[..nr_bytes]);
             }
             Err(e) if e.kind() == ErrorKind::Interrupted => continue,
