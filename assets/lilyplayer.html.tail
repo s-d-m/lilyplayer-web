@@ -1,0 +1,321 @@
+        self.loaderSubState = "Compiling";
+        setStatus("Loading") // trigger loaderSubState update
+console.log("data has type " + typeof(data));
+
+   console.log("in loadEmscriptenModule data.length is " + data.length);
+	for (var i = 0; i < 20; i++) {
+            console.log("data[" + i + "] = " + data[i]);
+	}
+
+	for (var i = 38392505 - 20; i < 38392505; i++) {
+            console.log("data[" + i + "] = " + data[i]);
+	}
+
+console.log("len array is " + data.length);
+
+            self.loaderSubState = "Compiling";
+            setStatus("Loading") // trigger loaderSubState update
+
+   var wasmModule;
+var wasmModulePromise = WebAssembly.compile(data).then(function(module) { wasmModule = module; console.log("wasm compiling done") },
+			       function(error) { console.log("Error when compiling module"); });
+console.log("wasmModule has type " + typeof(wasmModule));
+
+
+// console.log("before first completeLoadEmscriptenModule");
+// completeLoadEmscriptenModule(applicationName, emscriptenModuleSource, wasmModule);
+// console.log("after first completeLoadEmscriptenModule");
+
+//         // Fetch and compile wasm module
+//         var wasmModule2 = undefined;
+//         var wasmModulePromise = fetchCompileWasm(applicationName + ".wasm").then(function (module) {
+//             wasmModule2 = module;
+//         });
+// console.log("wasmModule2 has type " + typeof(wasmModule));
+
+        // Wait for all resources ready
+Promise.all([wasmModulePromise]).then(function(){
+console.log("wasmModule has type " + typeof(wasmModule));
+
+            completeLoadEmscriptenModule(applicationName, emscriptenModuleSource, wasmModule);
+        }).catch(function(error) {
+            self.error = error;
+            setStatus("Error");
+        });
+
+    }
+
+    function completeLoadEmscriptenModule(applicationName, emscriptenModuleSource, wasmModule) {
+console.log("in completeLoadEmscriptenModule wasmModule has type" + typeof(wasmModule));
+        // The wasm binary has been compiled into a module during resource download,
+        // and is ready to be instantiated. Define the instantiateWasm callback which
+        // emscripten will call to create the instance.
+        self.moduleConfig.instantiateWasm = function(imports, successCallback) {
+	    console.log("before WebAssembly.instantiate");
+            WebAssembly.instantiate(wasmModule, imports).then(function(instance) {
+console.log("WebAssembly.instantiate success");
+                successCallback(instance, wasmModule);
+            }, function(error) {
+		console.log("WebAssembly.instantiate :-( failed");
+                self.error = error;
+		console.log("Error is " + error);
+                setStatus("Error");
+            });
+            return {};
+        };
+
+console.log("After setting instantiateWasm field");
+
+
+        self.moduleConfig.locateFile = self.moduleConfig.locateFile || function(filename) {
+            return config.path + filename;
+        };
+
+        // Attach status callbacks
+        self.moduleConfig.setStatus = self.moduleConfig.setStatus || function(text) {
+            // Currently the only usable status update from this function
+            // is "Running..."
+            if (text.startsWith("Running"))
+                setStatus("Running");
+        };
+        self.moduleConfig.monitorRunDependencies = self.moduleConfig.monitorRunDependencies || function(left) {
+          //  console.log("monitorRunDependencies " + left)
+        };
+
+        // Attach standard out/err callbacks.
+        self.moduleConfig.print = self.moduleConfig.print || function(text) {
+            if (config.stdoutEnabled)
+                console.log(text)
+        };
+        self.moduleConfig.printErr = self.moduleConfig.printErr || function(text) {
+            // Filter out OpenGL getProcAddress warnings. Qt tries to resolve
+            // all possible function/extension names at startup which causes
+            // emscripten to spam the console log with warnings.
+            if (text.startsWith !== undefined && text.startsWith("bad name in getProcAddress:"))
+                return;
+
+            if (config.stderrEnabled)
+                console.log(text)
+        };
+
+        // Error handling: set status to "Exited", update crashed and
+        // exitCode according to exit type.
+        // Emscripten will typically call printErr with the error text
+        // as well. Note that emscripten may also throw exceptions from
+        // async callbacks. These should be handled in window.onerror by user code.
+        self.moduleConfig.onAbort = self.moduleConfig.onAbort || function(text) {
+            publicAPI.crashed = true;
+            publicAPI.exitText = text;
+            setStatus("Exited");
+        };
+        self.moduleConfig.quit = self.moduleConfig.quit || function(code, exception) {
+
+            // Emscripten (and Qt) supports exiting from main() while keeping the app
+            // running. Don't transition into the "Exited" state for clean exits.
+            if (code == 0)
+                return;
+
+            if (exception.name == "ExitStatus") {
+                // Clean exit with code
+                publicAPI.exitText = undefined
+                publicAPI.exitCode = code;
+            } else {
+                publicAPI.exitText = exception.toString();
+                publicAPI.crashed = true;
+            }
+            setStatus("Exited");
+        };
+
+        self.moduleConfig.preRun = self.moduleConfig.preRun || []
+        self.moduleConfig.preRun.push(function(module) {
+            // Set environment variables
+            for (var [key, value] of Object.entries(config.environment)) {
+                module.ENV[key.toUpperCase()] = value;
+            }
+            // Propagate Qt module properties
+            module.qtCanvasElements = self.qtCanvasElements;
+            module.qtFontDpi = self.qtFontDpi;
+        });
+
+        self.moduleConfig.mainScriptUrlOrBlob = new Blob([emscriptenModuleSource], {type: 'text/javascript'});
+
+        self.qtCanvasElements = config.canvasElements;
+
+        config.restart = function() {
+
+            // Restart by reloading the page. This will wipe all state which means
+            // reload loops can't be prevented.
+            if (config.restartType == "ReloadPage") {
+                location.reload();
+            }
+
+            // Restart by readling the emscripten app module.
+            ++self.restartCount;
+            if (self.restartCount > config.restartLimit) {
+                self.error = "Error: This application has crashed too many times and has been disabled. Reload the page to try again."
+                setStatus("Error");
+                return;
+            }
+            loadEmscriptenModule(applicationName);
+        };
+
+        publicAPI.exitCode = undefined;
+        publicAPI.exitText = undefined;
+        publicAPI.crashed = false;
+
+console.log("before eval emscriptenModuleSource");
+
+
+        // Load the Emscripten application module. This is done by eval()'ing the
+        // javascript runtime generated by Emscripten, and then calling
+        // createQtAppInstance(), which was added to the global scope.
+        eval(emscriptenModuleSource);
+console.log("after eval emscriptenModuleSource");
+console.log("before create Qt AppInstance");
+
+        createQtAppInstance(self.moduleConfig).then(function(module) {
+            self.module = module;
+        });
+console.log("after create Qt AppInstance");
+    }
+
+    function setErrorContent() {
+        if (config.containerElements === undefined) {
+            if (config.showError !== undefined)
+                config.showError(self.error);
+            return;
+        }
+
+        for (container of config.containerElements) {
+            var errorElement = config.showError(self.error, container);
+            container.appendChild(errorElement);
+        }
+    }
+
+    function setLoaderContent() {
+        if (config.containerElements === undefined) {
+            if (config.showLoader !== undefined)
+                config.showLoader(self.loaderSubState);
+            return;
+        }
+
+        for (container of config.containerElements) {
+            var loaderElement = config.showLoader(self.loaderSubState, container);
+            container.appendChild(loaderElement);
+        }
+    }
+
+    function setCanvasContent() {
+        if (config.containerElements === undefined) {
+            if (config.showCanvas !== undefined)
+                config.showCanvas();
+            return;
+        }
+
+        for (var i = 0; i < config.containerElements.length; ++i) {
+            var container = config.containerElements[i];
+            var canvas = config.canvasElements[i];
+            config.showCanvas(canvas, container);
+            container.appendChild(canvas);
+        }
+    }
+
+    function setExitContent() {
+
+        // publicAPI.crashed = true;
+
+        if (publicAPI.status != "Exited")
+            return;
+
+        if (config.containerElements === undefined) {
+            if (config.showExit !== undefined)
+                config.showExit(publicAPI.crashed, publicAPI.exitCode);
+            return;
+        }
+
+        if (!publicAPI.crashed)
+            return;
+
+        for (container of config.containerElements) {
+            var loaderElement = config.showExit(publicAPI.crashed, publicAPI.exitCode, container);
+            if (loaderElement !== undefined)
+                container.appendChild(loaderElement);
+        }
+    }
+
+    var committedStatus = undefined;
+    function handleStatusChange() {
+        if (publicAPI.status != "Loading" && committedStatus == publicAPI.status)
+            return;
+        committedStatus = publicAPI.status;
+
+        if (publicAPI.status == "Error") {
+            setErrorContent();
+        } else if (publicAPI.status == "Loading") {
+            setLoaderContent();
+        } else if (publicAPI.status == "Running") {
+            setCanvasContent();
+        } else if (publicAPI.status == "Exited") {
+            if (config.restartMode == "RestartOnExit" ||
+                config.restartMode == "RestartOnCrash" && publicAPI.crashed) {
+                    committedStatus = undefined;
+                    config.restart();
+            } else {
+                setExitContent();
+            }
+        }
+
+        // Send status change notification
+        if (config.statusChanged)
+            config.statusChanged(publicAPI.status);
+    }
+
+    function setStatus(status) {
+        if (status != "Loading" && publicAPI.status == status)
+            return;
+        publicAPI.status = status;
+
+        window.setTimeout(function() { handleStatusChange(); }, 0);
+    }
+
+    function addCanvasElement(element) {
+        if (publicAPI.status == "Running")
+            self.module.qtAddCanvasElement(element);
+        else
+            console.log("Error: addCanvasElement can only be called in the Running state");
+    }
+
+    function removeCanvasElement(element) {
+        if (publicAPI.status == "Running")
+            self.module.qtRemoveCanvasElement(element);
+        else
+            console.log("Error: removeCanvasElement can only be called in the Running state");
+    }
+
+    function resizeCanvasElement(element) {
+        if (publicAPI.status == "Running")
+            self.module.qtResizeCanvasElement(element);
+    }
+
+    function setFontDpi(dpi) {
+        self.qtFontDpi = dpi;
+        if (publicAPI.status == "Running")
+            self.qtSetFontDpi(dpi);
+    }
+
+    function fontDpi() {
+        return self.qtFontDpi;
+    }
+
+    function module() {
+        return self.module;
+    }
+
+    setStatus("Created");
+
+    return publicAPI;
+}
+
+    </script>
+  </body>
+</html>
