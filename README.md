@@ -3,7 +3,7 @@ Lilyplayer-web
 
 If you are interested in lilyplayer, you can see its code at https://github.com/s-d-m/lilyplayer .
 
-If you want a live demo, in your browser, you can use it at https://lilyplayer-web.shuttleapp.rs/
+If you want a live demo, in your browser, you can use it at https://lilyplayer.shuttleapp.rs/
 
 It takes some time to load as it downloads about 50MiB at the start.
 

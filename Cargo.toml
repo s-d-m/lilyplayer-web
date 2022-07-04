@@ -1,5 +1,5 @@
 [package]
-name = "lilyplayer-web"
+name = "lilyplayer"
 version = "0.1.0"
 edition = "2021"
 
